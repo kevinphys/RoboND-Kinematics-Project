@@ -77,7 +77,7 @@ def handle_calculate_IK(req):
                         [       0,       0,       1]])
 
 
-	R_correct = R_z(pi) * R_y(-pi/2)
+	R_correct = R_z.evalf(subs({'y': pi})) * R_y.evalf(subs({'p': -pi/2}))
 
 	Rrpy = R_z * R_y * R_x * R_correct
 
@@ -107,7 +107,7 @@ def handle_calculate_IK(req):
 
 		### Your IK code here
 		R_EE = Rrpy.subs({'r': roll, 'p': pitch, 'y': yaw})
-		P_WC = Matrix([[px], [py], [pz]]) - (0.303) * R_EE[;,2]
+		P_WC = Matrix([[px], [py], [pz]]) - (0.303) * R_EE[:,2]
 
 		# Calculate joint angles using Geometric IK method
 		theta1 = atan2(P_WC[1], P_WC[0])
@@ -124,7 +124,19 @@ def handle_calculate_IK(req):
 		theta3 = pi/2 - b - atan2(0.054, 1.5) 
 
 		R0_3 = R0_3.evalf(subs={q1: theta1, q2: theta2, q3:theta3})
-		R3_6 = R0_3.inv() * R_EE
+		R3_6 = R0_3.inv("LU") * R_EE
+
+		print(R3_6) # debug end effector rotation matrix
+
+		theta5 = atan2(sqrt(R3_6[0,2]*R3_6[0,2] + R3_6[2,2]*R3_6[2,2]),R3_6[1,2])
+            
+		# select best solution based on theta5
+		if (theta5 > pi) :
+			theta4 = atan2(-R3_6[2,2], R3_6[0,2])
+			theta6 = atan2(R3_6[1,1],-R3_6[1,0])
+		else:
+			theta4 = atan2(R3_6[2,2], -R3_6[0,2])
+			theta6 = atan2(-R3_6[1,1],R3_6[1,0])
 
 		# Populate response for the IK request
 		# In the next line replace theta1,theta2...,theta6 by your joint angle variables
