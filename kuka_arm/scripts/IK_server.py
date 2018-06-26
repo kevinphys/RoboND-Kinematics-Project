@@ -19,7 +19,6 @@ from mpmath import *
 from sympy import *
 
 
-
 def handle_calculate_IK(req):
     rospy.loginfo("Received %s eef-poses from the plan" % len(req.poses))
     if len(req.poses) < 1:
@@ -60,6 +59,17 @@ def handle_calculate_IK(req):
 	T4_5 = tf_matrix(alpha4, a4, d5, q5).subs(dh_table)
 	T5_6 = tf_matrix(alpha5, a5, d6, q6).subs(dh_table)
 	T6_E = tf_matrix(alpha6, a6, d7, q7).subs(dh_table)
+	# print("T0_1=", T0_1)
+	# print("T1_2=", T1_2)
+	# print("T2_1=", T2_3)
+	# print("T3_4=", T3_4)
+	# print("T4_5=", T4_5)
+	# print("T5_6=", T5_6)
+	# print("T6_E=", T6_E)
+
+	# Generate homogeneous transform matrix from base_link to gripper_link
+	T0_E = T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_E
+	# print("T0_E=", T0_E)
 
 	# Extract rotation matrices from the transformation matrices
 	r, p, y = symbols('r p y')
@@ -84,9 +94,6 @@ def handle_calculate_IK(req):
 
 	R0_3 = T0_1[0:3,0:3] * T1_2[0:3,0:3] * T2_3[0:3,0:3]
 
-
-	# T0_E = T0_1 * T1_2 * T2_3 * T3_4 * T4_5 * T5_6 * T6_E
-	# R0_E = T0_E[0:3,0:3] * R_correct 
 
         # Initialize service response
         joint_trajectory_list = []
@@ -123,20 +130,21 @@ def handle_calculate_IK(req):
 		theta2 = pi/2 - a - atan2(P_WC[2]-0.75, sqrt(P_WC[0]**2+P_WC[1]**2)-0.35)
 		theta3 = pi/2 - b - atan2(0.054, 1.5) 
 
+		# print(R0_3.inv("LU") * R_EE)
+
 		R0_3 = R0_3.evalf(subs={q1: theta1, q2: theta2, q3:theta3})
 		R3_6 = R0_3.inv("LU") * R_EE
 
 		# print(R3_6) # debug end effector rotation matrix
 
-		theta5 = atan2(sqrt(R3_6[0,2]*R3_6[0,2] + R3_6[2,2]*R3_6[2,2]),R3_6[1,2])
-            
-		# select best solution based on theta5
-		if (theta5 > pi) :
-			theta4 = atan2(-R3_6[2,2], R3_6[0,2])
-			theta6 = atan2(R3_6[1,1],-R3_6[1,0])
+		theta5 = atan2(sqrt(R3_6[0,2]**2 + R3_6[2,2]**2),R3_6[1,2])
+		
+		if (sin(theta5) > 0):
+		 	theta4 = atan2(-R3_6[2,2], R3_6[0,2])
+		 	theta6 = atan2(R3_6[1,1], -R3_6[1,0])
 		else:
-			theta4 = atan2(R3_6[2,2], -R3_6[0,2])
-			theta6 = atan2(-R3_6[1,1],R3_6[1,0])
+		 	theta4 = atan2(R3_6[2,2], -R3_6[0,2])
+		 	theta6 = atan2(-R3_6[1,1], R3_6[1,0])
 
 		# Populate response for the IK request
 		# In the next line replace theta1,theta2...,theta6 by your joint angle variables
